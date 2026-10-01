@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Avinya AutonexX - Smart Curtain Controller</title>
+    <style>
+        :root {
+            --bg-deep: #05070a;
+            --panel-bg: #0b0e14;
+            --accent-cyan: #00f0ff;
+            --accent-blue: #38bdf8;
+            --accent-amber: #f59e0b;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --text-main: #f0f6fc;
+            --text-dim: #8b949e;
+            --border-color: #30363d;
+            --glass-border: #384152;
+            --curtain-sheer: rgba(220, 235, 255, 0.45);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .app-shell {
+            width: 100vw;
+            height: 100vh;
+            background: #0f1319;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @media (min-aspect-ratio: 4/3) and (min-width: 900px) {
+            .app-shell {
+                flex-direction: row;
+            }
+            .viewport {
+                width: 65% !important;
+                height: 100% !important;
+                border-bottom: none !important;
+                border-right: 6px solid #090d16 !important;
+            }
+            .dashboard-container {
+                width: 35% !important;
+                height: 100% !important;
+                border-top: none !important;
+                border-left: 1px solid var(--border-color) !important;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .app-shell {
+                max-width: 1600px;
+                max-height: 900px;
+                height: 92vh;
+                width: 95vw;
+                border-radius: 24px;
+                box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 1px 1px rgba(255,255,255,0.1);
+                margin: auto;
+            }
+        }
+
+        /* VIEWPORT DISPLAY */
+        .viewport {
+            position: relative;
+            width: 100%;
+            height: 52vh;
+            background: #05070a;
+            overflow: hidden;
+            border-bottom: 6px solid #090d16;
+            box-shadow: inset 0 20px 40px rgba(0,0,0,0.9);
+            flex-shrink: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .window-scenery {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center;
+            transition: opacity 0.8s ease, filter 0.8s ease;
+            z-index: 1;
+            filter: brightness(1) contrast(1.05);
+        }
+
+        .window-sill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 18px;
+            background: linear-gradient(180deg, #1f242d 0%, #0d1015 100%);
+            z-index: 5;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.7);
+        }
+
+        .curtain-track-rail {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 16px;
+            background: linear-gradient(180deg, #2a313d 0%, #151921 100%);
+            z-index: 6;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+
+        .curtain-motor-led {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 8px var(--accent-cyan);
+            margin-left: auto;
+            transition: background 0.3s ease;
+        }
+
+        .curtain-motor-led.moving {
+            animation: blinkLed 0.4s infinite alternate;
+        }
+
+        @keyframes blinkLed {
+            0% { opacity: 0.2; }
+            100% { opacity: 1; box-shadow: 0 0 12px var(--accent-cyan); }
+        }
+
+        /* CURTAIN PANELS */
+        .curtain-container {
+            position: absolute;
+            top: 14px;
+            left: 0;
+            right: 0;
+            bottom: 12px;
+            z-index: 3;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .curtain-panel {
+            height: 100%;
+            background: linear-gradient(90deg, 
+                #121824 0%, 
+                #222c3d 25%, 
+                #161d2a 50%, 
+                #2a364a 75%, 
+                #10141f 100%);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            position: relative;
+            transition: width 0.05s linear;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .curtain-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.03) 0px,
+                rgba(255,255,255,0.03) 12px,
+                rgba(0,0,0,0.15) 12px,
+                rgba(0,0,0,0.15) 24px
+            );
+        }
+
+        .curtain-left {
+            border-right: 3px solid rgba(255,255,255,0.15);
+            border-bottom-right-radius: 8px;
+        }
+
+        .curtain-right {
+            border-left: 3px solid rgba(255,255,255,0.15);
+            border-bottom-left-radius: 8px;
+        }
+
+        /* SHEER LAYER */
+        .sheer-curtain {
+            position: absolute;
+            top: 14px;
+            left: 0;
+            right: 0;
+            bottom: 12px;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+        }
+
+        .sheer-curtain.active {
+            opacity: 1;
+        }
+
+        .sheer-panel {
+            width: 50%;
+            height: 100%;
+            background: var(--curtain-sheer);
+            backdrop-filter: blur(3px);
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.2);
+            position: relative;
+        }
+
+        .sheer-panel::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                90deg,
+                rgba(255,255,255,0.1) 0px,
+                rgba(255,255,255,0.1) 20px,
+                transparent 20px,
+                transparent 40px
+            );
+        }
+
+        .ambient-light-wash {
+            position: absolute;
+            inset: 0;
+            z-index: 4;
+            pointer-events: none;
+            transition: all 0.5s ease;
+            mix-blend-mode: overlay;
+        }
+
+        /* BRAND & TELEMETRY */
+        .brand-header {
+            position: absolute;
+            top: 22px;
+            left: 18px;
+            background: rgba(11, 14, 20, 0.88);
+            backdrop-filter: blur(12px);
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        }
+
+        .brand-top { font-size: 0.38rem; letter-spacing: 3px; color: #ffffff; font-weight: 600; }
+        .brand-middle { display: flex; align-items: center; font-size: 0.8rem; font-weight: 900; color: #ffffff; letter-spacing: 1px; }
+        .brand-arrow { width: 10px; height: 10px; margin: 0 -1px; }
+        .brand-bottom { font-size: 0.3rem; color: var(--accent-blue); letter-spacing: 1.5px; font-weight: 700; }
+
+        .telemetry-bar {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(11, 14, 20, 0.92);
+            backdrop-filter: blur(10px);
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            gap: 14px;
+            z-index: 10;
+            white-space: nowrap;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .tel-item { font-size: 0.55rem; color: var(--text-dim); font-weight: 700; letter-spacing: 0.5px; }
+        .tel-item span { color: var(--accent-cyan); font-weight: 800; }
+
+        /* TOAST NOTIFICATION */
+        .toast-notification {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(11, 14, 20, 0.95);
+            border: 1px solid var(--accent-cyan);
+            color: var(--text-main);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            box-shadow: 0 6px 24px rgba(0, 240, 255, 0.3);
+            z-index: 100;
+            transition: top 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        .toast-notification.show { top: 22px; }
+        .toast-dot { width: 8px; height: 8px; background: var(--accent-cyan); border-radius: 50%; box-shadow: 0 0 8px var(--accent-cyan); }
+
+        /* CONTROL PANEL */
+        .dashboard-container {
+            position: relative;
+            flex: 1;
+            background: radial-gradient(circle at 50% 100%, #1e293b 0%, #090d16 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            overflow: hidden;
+            border-top: 2px solid #334155;
+        }
+
+        .glass-switch-plate {
+            width: 100%;
+            height: 100%;
+            max-width: 700px;
+            background: linear-gradient(135deg, #0b0e14 0%, #040507 50%, #111620 100%);
+            border-radius: 20px;
+            border: 2px solid var(--glass-border);
+            box-shadow: 
+                0 20px 40px rgba(0,0,0,0.95),
+                inset 0 0 15px rgba(255,255,255,0.05);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            position: relative;
+        }
+
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: auto auto;
+            row-gap: 18px;
+            column-gap: 16px;
+            align-items: center;
+            justify-items: center;
+            width: 100%;
+            margin: auto 0;
+        }
+
+        .switch-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .switch-label {
+            font-size: 0.45rem;
+            letter-spacing: 0.6px;
+            color: var(--text-dim);
+            font-weight: 800;
+            transition: color 0.2s ease;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .touch-ring {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid #484f58;
+            background: rgba(10, 14, 20, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--text-dim);
+            position: relative;
+        }
+
+        .touch-ring svg, .master-btn svg {
+            width: 21px;
+            height: 21px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2.2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: all 0.2s ease;
+        }
+
+        .touch-ring:hover {
+            border-color: #8b949e;
+            color: #f0f6fc;
+        }
+
+        .touch-ring:active { transform: scale(0.92); }
+
+        .touch-ring.active {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 240, 255, 0.15);
+            color: var(--accent-cyan);
+            box-shadow: 0 0 14px rgba(0, 240, 255, 0.4);
+        }
+        
+        .touch-ring.active + .switch-label { color: var(--accent-cyan); }
+
+        .touch-ring.preset-active {
+            border-color: var(--accent-amber);
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent-amber);
+            box-shadow: 0 0 14px rgba(245, 158, 11, 0.4);
+        }
+        .touch-ring.preset-active + .switch-label { color: var(--accent-amber); }
+
+        .master-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 2px solid #484f58;
+            background: rgba(25, 10, 10, 0.8);
+            color: var(--accent-red);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.6);
+            transition: all 0.2s ease;
+        }
+
+        .master-btn.active {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            box-shadow: 0 0 14px rgba(34, 197, 94, 0.5);
+            background: rgba(10, 25, 15, 0.8);
+        }
+        
+        .master-btn.active + .switch-label { color: var(--accent-green); }
+
+        .plate-brand {
+            font-size: 0.38rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #21262d;
+            white-space: nowrap;
+            pointer-events: none;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    
+    <!-- NOTIFICATION TOAST -->
+    <div class="toast-notification" id="toast">
+        <div class="toast-dot"></div>
+        <span id="toast-text">Curtain Automation System Active</span>
+    </div>
+
+    <!-- VIEWPORT DISPLAY -->
+    <div class="viewport" id="viewport-box">
+        
+        <!-- Outside Scenery Image -->
+        <img class="window-scenery" id="scenery-img" src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80" alt="Outdoor View">
+
+        <!-- Sheer Inner Layer Curtain -->
+        <div class="sheer-curtain" id="sheer-layer">
+            <div class="sheer-panel"></div>
+            <div class="sheer-panel"></div>
+        </div>
+
+        <!-- Main Motorized Curtains -->
+        <div class="curtain-container">
+            <div class="curtain-panel curtain-left" id="curtain-left" style="width: 25%;"></div>
+            <div class="curtain-panel curtain-right" id="curtain-right" style="width: 25%;"></div>
+        </div>
+
+        <!-- Track Rail & Sill -->
+        <div class="curtain-track-rail">
+            <div class="curtain-motor-led" id="motor-led" title="Motor Status"></div>
+        </div>
+        <div class="window-sill"></div>
+
+        <!-- Ambient Wash Overlay -->
+        <div class="ambient-light-wash" id="hall-wash"></div>
+
+        <!-- Branding Overlay -->
+        <div class="brand-header">
+            <span class="brand-top">AVINYA</span>
+            <div class="brand-middle">
+                AUTONE
+                <svg class="brand-arrow" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 4L14 12L4 20" stroke="#38BDF8" stroke-width="4.5" stroke-linecap="square"/>
+                </svg>
+                X
+            </div>
+            <span class="brand-bottom">CURTAIN AUTONEX</span>
+        </div>
+
+        <!-- Telemetry Data Bar -->
+        <div class="telemetry-bar">
+            <div class="tel-item">CURTAIN: <span id="tel-pos">50% OPEN</span></div>
+            <div class="tel-item">MODE: <span id="tel-mode">DAYLIGHT</span></div>
+            <div class="tel-item">SHEER: <span id="tel-sheer">OFF</span></div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD CONTROL PANEL -->
+    <div class="dashboard-container">
+        <div class="glass-switch-plate">
+            
+            <div class="buttons-grid">
+                
+                <!-- ROW 1 -->
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-open" onclick="triggerCurtainAction('open')" title="Fully Open Curtains">
+                        <svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l4-4M4 12l4 4M20 12l-4-4M20 12l-4 4"></path></svg>
+                    </div>
+                    <span class="switch-label">OPEN</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-close" onclick="triggerCurtainAction('close')" title="Fully Close Curtains">
+                        <svg viewBox="0 0 24 24"><path d="M12 4v16M12 4l-4 4M12 4l4 4M12 20l-4-4M12 20l4-4"></path></svg>
+                    </div>
+                    <span class="switch-label">CLOSE</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-stop" onclick="stopCurtainMotor()" title="Pause Curtain Movement">
+                        <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                    </div>
+                    <span class="switch-label">PAUSE</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-sheer" onclick="toggleSheer()" title="Toggle Sheer Layer">
+                        <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16" stroke-dasharray="2 2"></path></svg>
+                    </div>
+                    <span class="switch-label" id="sheer-lbl">SHEER</span>
+                </div>
+
+                <!-- ROW 2 -->
+                <div class="switch-wrapper">
+                    <div class="touch-ring preset-active" id="sw-day" onclick="setPreset('day')" title="Daylight View Mode">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    </div>
+                    <span class="switch-label">DAY MODE</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-night" onclick="setPreset('night')" title="Night Privacy Mode">
+                        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    </div>
+                    <span class="switch-label">NIGHT</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <div class="touch-ring" id="sw-cinema" onclick="setPreset('cinema')" title="Cinema Ambient Mode">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    </div>
+                    <span class="switch-label">CINEMA</span>
+                </div>
+
+                <div class="switch-wrapper">
+                    <button class="master-btn active" id="master-btn" onclick="toggleSystemPower()" title="Master System Power">
+                        <svg viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                    </button>
+                    <span class="switch-label">POWER</span>
+                </div>
+
+            </div>
+
+            <div class="plate-brand">AVINYA AUTONEXX</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const curtainLeft = document.getElementById('curtain-left');
+    const curtainRight = document.getElementById('curtain-right');
+    const sheerLayer = document.getElementById('sheer-layer');
+    const sceneryImg = document.getElementById('scenery-img');
+    const hallWash = document.getElementById('hall-wash');
+    const motorLed = document.getElementById('motor-led');
+    
+    const telPos = document.getElementById('tel-pos');
+    const telMode = document.getElementById('tel-mode');
+    const telSheer = document.getElementById('tel-sheer');
+    
+    const toast = document.getElementById('toast');
+    const toastText = document.getElementById('toast-text');
+    const masterBtn = document.getElementById('master-btn');
+    const viewportBox = document.getElementById('viewport-box');
+
+    let systemOn = true;
+    let curtainPosition = 50; 
+    let targetPosition = 50;
+    let animationInterval = null;
+    let sheerActive = false;
+    let currentPreset = 'day';
+
+    // PRESETS ADJUSTED: Cinema mode now uses an ultra-dark ambient window lighting profile with fully drawn curtains instead of showing a movie theater room.
+    const presets = {
+        day: {
+            scenery: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+            wash: 'radial-gradient(circle at 50% 30%, rgba(255, 235, 170, 0.4) 0%, rgba(15, 12, 10, 0.6) 80%)',
+            filter: 'brightness(1) contrast(1.05)'
+        },
+        night: {
+            scenery: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=1200&q=80',
+            wash: 'radial-gradient(circle at 50% 30%, rgba(20, 35, 70, 0.6) 0%, rgba(5, 5, 10, 0.95) 80%)',
+            filter: 'brightness(0.5) contrast(1.2)'
+        },
+        cinema: {
+            scenery: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=1200&q=80',
+            wash: 'radial-gradient(circle at 50% 50%, rgba(88, 28, 135, 0.45) 0%, rgba(3, 7, 18, 0.98) 85%)',
+            filter: 'brightness(0.15) contrast(1.5)'
+        }
+    };
+
+    function triggerHaptic() {
+        if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function showToast(message) {
+        toastText.innerText = message;
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 2600);
+    }
+
+    function setCurtainPosition(pct, immediate = false) {
+        curtainPosition = Math.max(0, Math.min(100, pct));
+        
+        let panelWidth = 50 - (curtainPosition * 0.45);
+        
+        curtainLeft.style.width = panelWidth + '%';
+        curtainRight.style.width = panelWidth + '%';
+
+        if (curtainPosition === 100) telPos.innerText = '100% (OPEN)';
+        else if (curtainPosition === 0) telPos.innerText = '0% (CLOSED)';
+        else telPos.innerText = Math.round(curtainPosition) + '% OPEN';
+
+        if (immediate) targetPosition = curtainPosition;
+    }
+
+    function animateToPosition(target) {
+        if (!systemOn) return;
+        targetPosition = Math.max(0, Math.min(100, target));
+        
+        if (animationInterval) clearInterval(animationInterval);
+        
+        if (Math.abs(curtainPosition - targetPosition) < 0.5) return;
+
+        motorLed.classList.add('moving');
+
+        animationInterval = setInterval(() => {
+            if (Math.abs(curtainPosition - targetPosition) < 0.8) {
+                setCurtainPosition(targetPosition, true);
+                clearInterval(animationInterval);
+                animationInterval = null;
+                motorLed.classList.remove('moving');
+            } else {
+                let step = targetPosition > curtainPosition ? 0.8 : -0.8;
+                setCurtainPosition(curtainPosition + step);
+            }
+        }, 16);
+    }
+
+    function stopCurtainMotor() {
+        if (!systemOn) return;
+        triggerHaptic();
+        if (animationInterval) {
+            clearInterval(animationInterval);
+            animationInterval = null;
+        }
+        motorLed.classList.remove('moving');
+        showToast("Curtain Movement Paused");
+    }
+
+    function triggerCurtainAction(action) {
+        if (!systemOn) return;
+        triggerHaptic();
+        if (action === 'open') {
+            animateToPosition(100);
+            showToast("Opening Curtains...");
+        } else if (action === 'close') {
+            animateToPosition(0);
+            showToast("Closing Curtains...");
+        }
+    }
+
+    function toggleSheer() {
+        if (!systemOn) return;
+        triggerHaptic();
+        sheerActive = !sheerActive;
+        
+        const sheerBtn = document.getElementById('sw-sheer');
+        if (sheerActive) {
+            sheerBtn.classList.add('active');
+            sheerLayer.classList.add('active');
+            telSheer.innerText = 'ACTIVE';
+            showToast("Sheer Layer Deployed");
+        } else {
+            sheerBtn.classList.remove('active');
+            sheerLayer.classList.remove('active');
+            telSheer.innerText = 'OFF';
+            showToast("Sheer Layer Retracted");
+        }
+    }
+
+    function setPreset(presetKey) {
+        if (!systemOn) return;
+        triggerHaptic();
+        currentPreset = presetKey;
+
+        ['day', 'night', 'cinema'].forEach(k => {
+            const btn = document.getElementById('sw-' + k);
+            if (btn) btn.classList.remove('preset-active');
+        });
+        document.getElementById('sw-' + presetKey).classList.add('preset-active');
+
+        const config = presets[presetKey];
+        sceneryImg.src = config.scenery;
+        sceneryImg.style.filter = config.filter;
+        hallWash.style.background = config.wash;
+
+        telMode.innerText = presetKey.toUpperCase();
+
+        if (presetKey === 'cinema') {
+            animateToPosition(0);
+            showToast("Cinema Mode: Closing Curtains & Dimming Ambient Light");
+        } else if (presetKey === 'day') {
+            animateToPosition(80);
+            showToast("Daylight Mode Activated");
+        } else if (presetKey === 'night') {
+            animateToPosition(10);
+            showToast("Night Mode Activated");
+        }
+    }
+
+    function toggleSystemPower() {
+        triggerHaptic();
+        systemOn = !systemOn;
+
+        if (systemOn) {
+            masterBtn.classList.add('active');
+            viewportBox.style.opacity = '1';
+            setPreset(currentPreset);
+            showToast("System Online");
+        } else {
+            stopCurtainMotor();
+            masterBtn.classList.remove('active');
+            viewportBox.style.opacity = '0.35';
+            telMode.innerText = 'OFFLINE';
+            telPos.innerText = 'STANDBY';
+            showToast("System Powered Down");
+        }
+    }
+
+    setCurtainPosition(50, true);
+</script>
+
+</body>
+</html>
